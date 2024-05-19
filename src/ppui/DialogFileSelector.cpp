@@ -116,17 +116,17 @@ DialogFileSelector::DialogFileSelector(PPScreen* screen,
 	x3+=button->getSize().width + space;
 	
 	button = new PPButton(PP_MESSAGEBOX_BUTTON_USER2, screen, this, PPPoint(x3, y2 - 16), PPSize(size, 12));
-	button->setText("Parent");
+	button->setText("mc0:");
 	messageBoxContainerGeneric->addControl(button);
 	x3+=button->getSize().width + space;
 
 	button = new PPButton(PP_MESSAGEBOX_BUTTON_USER3, screen, this, PPPoint(x3, y2 - 16), PPSize(size, 12));
-	button->setText("Root");
+	button->setText("hdd0:");
 	messageBoxContainerGeneric->addControl(button);
 	x3+=button->getSize().width + space;
 
 	button = new PPButton(PP_MESSAGEBOX_BUTTON_USER1, screen, this, PPPoint(x3, y2 - 16), PPSize(size+2, 12));
-	button->setText("Home");
+	button->setText("mass:");
 	messageBoxContainerGeneric->addControl(button);
 	x3+=button->getSize().width + space;
 

@@ -37,6 +37,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#define PATH_MAX 4096
+
 #ifdef __PSP__
 #include <pspkernel.h>
 #include <sys/syslimits.h>
@@ -143,6 +145,6 @@ void System::msleep(int msecs)
 	// usleep is not implemented on AROS
 	sleep(msecs < 1000 ? 1 : msecs/1000);
 #else
-	usleep(msecs*1000);
+	msleep(msecs);
 #endif
 }

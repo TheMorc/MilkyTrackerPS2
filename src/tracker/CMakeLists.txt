@@ -108,84 +108,6 @@ add_executable(tracker
 
     # Headers
     ${PROJECT_BINARY_DIR}/src/tracker/version.h
-    AnimatedFXControl.h
-    ColorExportImport.h
-    ColorPaletteContainer.h
-    ControlIDs.h
-    DialogChannelSelector.h
-    DialogEQ.h
-    DialogGroupSelection.h
-    DialogHandlers.h
-    DialogListBox.h
-    DialogPanning.h
-    DialogQuickChooseInstrument.h
-    DialogResample.h
-    DialogWithValues.h
-    DialogZap.h
-    EQConstants.h
-    EditModes.h
-    EditorBase.h
-    EnvelopeContainer.h
-    EnvelopeEditor.h
-    EnvelopeEditorControl.h
-    Equalizer.h
-    FileExtProvider.h
-    FileIdentificator.h
-    FileTypes.h
-    FilterParameters.h
-    GlobalColorConfig.h
-    InputControlListener.h
-    LogoBig.h
-    LogoSmall.h
-    ModuleEditor.h
-    ModuleServices.h
-    PatternEditor.h
-    PatternEditorControl.h
-    PatternEditorTools.h
-    PatternTools.h
-    PeakLevelControl.h
-    Piano.h
-    PianoControl.h
-    PlayerController.h
-    PlayerCriticalSection.h
-    PlayerLogic.h
-    PlayerMaster.h
-    RecPosProvider.h
-    RecorderLogic.h
-    ResamplerHelper.h
-    SIPButtons.h
-    SampleEditor.h
-    SampleEditorControl.h
-    SampleEditorControlLastValues.h
-    SampleEditorResampler.h
-    SamplePlayer.h
-    ScopesControl.h
-    SectionAbout.h
-    SectionAbstract.h
-    SectionAdvancedEdit.h
-    SectionDiskMenu.h
-    SectionHDRecorder.h
-    SectionInstruments.h
-    SectionOptimize.h
-    SectionQuickOptions.h
-    SectionSamples.h
-    SectionSettings.h
-    SectionSwitcher.h
-    SectionTranspose.h
-    SectionUpperLeft.h
-    SongLengthEstimator.h
-    SystemMessage.h
-    TabHeaderControl.h
-    TabManager.h
-    TabTitleProvider.h
-    TitlePageManager.h
-    ToolInvokeHelper.h
-    Tracker.h
-    TrackerConfig.h
-    TrackerSettingsDatabase.h
-    Undo.h
-    VRand.h
-    Zapper.h
 )
 
 # Set target name for the executable
@@ -194,7 +116,7 @@ if(APPLE OR WIN32)
     set_target_properties(tracker PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
 else()
     # Linux/other UNIX get a lower-case binary name
-    set_target_properties(tracker PROPERTIES OUTPUT_NAME ${PROJECT_NAME_LOWER})
+    set_target_properties(tracker PROPERTIES OUTPUT_NAME ${PROJECT_NAME_LOWER}.elf)
 endif()
 
 target_include_directories(tracker
@@ -368,11 +290,24 @@ if(UNIX)
     endif()
 endif()
 
-# OS X and Windows install to the root of the prefix, the others install to bin
-if(APPLE OR WIN32)
-    set(INSTALL_DEST .)
-else()
-    set(INSTALL_DEST ${CMAKE_INSTALL_BINDIR})
-endif()
+include_directories(
+    ${PS2SDK}/common/include
+    ${PS2SDK}/ee/include
+    ${PS2SDK}/ports/include
+    # Add any other include directories as necessary
+)
 
-install(TARGETS tracker DESTINATION ${INSTALL_DEST})
+link_directories(
+    ${PS2SDK}/common/lib
+    ${PS2SDK}/ee/lib
+    ${PS2SDK}/ports/lib
+    # Add any other link directories as necessary
+)
+
+target_link_libraries(tracker
+    -lc -ldebug -lSDL2 -lSDL2main
+    # Add any other libraries as necessary
+)
+
+SET(PLATFORM_PS2 TRUE)
+SET(PS2 TRUE)

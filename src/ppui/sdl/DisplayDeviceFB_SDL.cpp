@@ -29,6 +29,7 @@
  */
 
 #include "DisplayDeviceFB_SDL.h"
+#include <debug.h>
 #include "Graphics.h"
 
 PPDisplayDeviceFB::PPDisplayDeviceFB(pp_int32 width,
@@ -42,17 +43,14 @@ PPDisplayDeviceFB::PPDisplayDeviceFB(pp_int32 width,
 	needsTemporaryBuffer((orientation != ORIENTATION_NORMAL) || (scaleFactor != 1)),
 	temporaryBuffer(NULL)
 {
+scr_printf("createwindow.\n");
 	// Create an SDL window and surface
-	theWindow = CreateWindow(realWidth, realHeight, bpp,
-#ifdef HIDPI_SUPPORT
-							  SDL_WINDOW_ALLOW_HIGHDPI |							// Support for 'Retina'/Hi-DPI displays
-#endif
-							  SDL_WINDOW_RESIZABLE	 |								// MilkyTracker's window is resizable
-							  (bFullScreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));	// Use 'fake fullscreen' because we can scale
+	theWindow = CreateWindow(realWidth, realHeight, bpp, 0);	// Use 'fake fullscreen' because we can scale
 
 	if (theWindow == NULL)
 	{
-		fprintf(stderr, "SDL: Could not create window.\n");
+		
+ 	    scr_printf("SDL: Could not create window.\n");
 		exit(EXIT_FAILURE);
 	}
 	
@@ -60,6 +58,7 @@ PPDisplayDeviceFB::PPDisplayDeviceFB(pp_int32 width,
 	theRenderer = SDL_CreateRenderer(theWindow, drv_index, 0);
 	if (theRenderer == NULL)
 	{
+		scr_printf("SDL_CreateRenderer failed.\n");
 		fprintf(stderr, "SDL: SDL_CreateRenderer failed: %s\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
@@ -74,10 +73,10 @@ PPDisplayDeviceFB::PPDisplayDeviceFB(pp_int32 width,
 	SDL_RendererInfo theRendererInfo;
 	if (!SDL_GetRendererInfo(theRenderer, &theRendererInfo))
 	{
-		if (theRendererInfo.flags & SDL_RENDERER_SOFTWARE) printf("SDL: Using software renderer.\n");
-		if (theRendererInfo.flags & SDL_RENDERER_ACCELERATED) printf("SDL: Using accelerated renderer.\n");
-		if (theRendererInfo.flags & SDL_RENDERER_PRESENTVSYNC) printf("SDL: Vsync enabled.\n");
-		if (theRendererInfo.flags & SDL_RENDERER_TARGETTEXTURE) printf("SDL: Renderer supports rendering to texture.\n");
+		if (theRendererInfo.flags & SDL_RENDERER_SOFTWARE) scr_printf("SDL: Using software renderer.\n");
+		if (theRendererInfo.flags & SDL_RENDERER_ACCELERATED) scr_printf("SDL: Using accelerated renderer.\n");
+		if (theRendererInfo.flags & SDL_RENDERER_PRESENTVSYNC) scr_printf("SDL: Vsync enabled.\n");
+		if (theRendererInfo.flags & SDL_RENDERER_TARGETTEXTURE) scr_printf("SDL: Renderer supports rendering to texture.\n");
 	}
 
 	// Lock aspect ratio and scale the UI up to fit the window
@@ -88,7 +87,7 @@ PPDisplayDeviceFB::PPDisplayDeviceFB(pp_int32 width,
 #endif
 
 	// Use linear filtering for the scaling (make this optional eventually)
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	//SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 
 	// Create surface for rendering graphics
 	theSurface = SDL_CreateRGBSurface(0, realWidth, realHeight, bpp == -1 ? 32 : bpp, 0, 0, 0, 0);
@@ -209,6 +208,10 @@ void PPDisplayDeviceFB::close()
 	currentGraphics->lock = true;
 }
 
+SDL_Rect mouse;
+
+//int splitPart = 0;
+
 void PPDisplayDeviceFB::update()
 {
 	if (!isUpdateAllowed() || !isEnabled())
@@ -219,14 +222,36 @@ void PPDisplayDeviceFB::update()
 		return;
 	}
 	
-	PPRect r(0, 0, getSize().width, getSize().height);
-	swap(r);
+	//SDL_Rect r0 = {0,0,640,120};
+	//SDL_Rect r1 = {0,120,640,50};
+	//SDL_Rect r2 = {0,170,640,318};
+	//void* surfaceOffset0 = (char*) theSurface->pixels + 0 * theSurface->pitch * theSurface->format->BytesPerPixel;
+	//void* surfaceOffset1 = (char*) theSurface->pixels + 60 * theSurface->pitch * theSurface->format->BytesPerPixel;
+	//void* surfaceOffset2 = (char*) theSurface->pixels + 85 * theSurface->pitch * theSurface->format->BytesPerPixel;
+	//
+	//if (splitPart == 0)
+	//	SDL_UpdateTexture(theTexture, &r0, surfaceOffset0, theSurface->pitch);
+	//else if (splitPart == 1)
+	//	SDL_UpdateTexture(theTexture, &r1, surfaceOffset1, theSurface->pitch);
+	//else if (splitPart == 2)
+	//	SDL_UpdateTexture(theTexture, &r2, surfaceOffset2, theSurface->pitch);
+	//
 	
-	// Update entire texture and copy to renderer
-	SDL_UpdateTexture(theTexture, NULL, theSurface->pixels, theSurface->pitch);
-	SDL_RenderClear(theRenderer);
+		SDL_UpdateTexture(theTexture, NULL, theSurface->pixels, theSurface->pitch);
+	// Update dirty area of texture and copy to renderer
+	
 	SDL_RenderCopy(theRenderer, theTexture, NULL, NULL);
+	SDL_SetRenderDrawColor(theRenderer, 255, 255, 255, 255);
+	SDL_GetGlobalMouseState(&mouse.x, &mouse.y);
+	SDL_RenderDrawLine(theRenderer, mouse.x, mouse.y, mouse.x+20, mouse.y+20);
+	SDL_RenderDrawLine(theRenderer, mouse.x, mouse.y, mouse.x+10, mouse.y);
+	SDL_RenderDrawLine(theRenderer, mouse.x, mouse.y, mouse.x, mouse.y+10);
 	SDL_RenderPresent(theRenderer);
+	
+	//if (splitPart == 3)
+	//	splitPart = 0;
+	//else
+	//	splitPart++;
 }
 
 void PPDisplayDeviceFB::update(const PPRect& r)
@@ -239,22 +264,19 @@ void PPDisplayDeviceFB::update(const PPRect& r)
 		return;
 	}
 
-	swap(r);
-	
-	PPRect r2(r);
-	r2.scale(scaleFactor);
-	
-	transformInverse(r2);
-
-	SDL_Rect r3 = { r2.x1, r2.y1, r2.width(), r2.height() };
+	SDL_Rect r3 = { r.x1, r.y1, r.width(), r.height() };
 	
 	// Calculate destination pixel data offset based on row pitch and x coordinate
-	void* surfaceOffset = (char*) theSurface->pixels + r2.y1 * theSurface->pitch + r2.x1 * theSurface->format->BytesPerPixel;
+	void* surfaceOffset = (char*) theSurface->pixels + r.y1 * theSurface->pitch + r.x1 * theSurface->format->BytesPerPixel;
 	
 	// Update dirty area of texture and copy to renderer
 	SDL_UpdateTexture(theTexture, &r3, surfaceOffset, theSurface->pitch);
-	SDL_RenderClear(theRenderer);
 	SDL_RenderCopy(theRenderer, theTexture, NULL, NULL);
+	SDL_GetGlobalMouseState(&mouse.x, &mouse.y);
+	SDL_SetRenderDrawColor(theRenderer, 255, 255, 255, 255);
+	SDL_RenderDrawLine(theRenderer, mouse.x, mouse.y, mouse.x+20, mouse.y+20);
+	SDL_RenderDrawLine(theRenderer, mouse.x, mouse.y, mouse.x+10, mouse.y);
+	SDL_RenderDrawLine(theRenderer, mouse.x, mouse.y, mouse.x, mouse.y+10);
 	SDL_RenderPresent(theRenderer);
 }
 

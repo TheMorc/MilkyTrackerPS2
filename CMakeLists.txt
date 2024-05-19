@@ -22,6 +22,13 @@
 cmake_minimum_required(VERSION 3.10)
 project(MilkyTracker)
 
+if(DEFINED ENV{PS2DEV})
+    SET(PS2DEV $ENV{PS2DEV})
+else()
+    message(FATAL_ERROR "The environment variable PS2DEV needs to be defined.")
+endif()
+
+
 # Set C++ standard to C++98
 set(CMAKE_CXX_STANDARD 98)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -217,8 +224,8 @@ if(APPLE)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ${SUFFIXES_ORIG})
 endif()
 
-add_subdirectory(docs)
-add_subdirectory(resources/music)
+#add_subdirectory(docs)
+#add_subdirectory(resources/music)
 add_subdirectory(src/compression)
 add_subdirectory(src/fx)
 add_subdirectory(src/milkyplay)
@@ -226,4 +233,56 @@ add_subdirectory(src/ppui)
 add_subdirectory(src/tracker)
 
 # Set MilkyTracker target as startup project in Visual Studio
+list(APPEND EXTRA_CFLAGS "-DPS2" "-D__PS2__" "-I$ENV{PS2SDK}/ports/include" "-I$ENV{PS2DEV}/gsKit/include")
+file(GLOB PS2_MAIN_SOURCES ${SDL2_SOURCE_DIR}/src/main/ps2/*.c)
+set(SDLMAIN_SOURCES ${SDLMAIN_SOURCES} ${PS2_MAIN_SOURCES})
+list(APPEND EXTRA_LIBS
+    patches
+    gskit
+    dmakit
+    ps2_drivers
+  )
+set(OPT_DEF_LIBC ON)
+  set(SDL_SHARED_ENABLED_BY_DEFAULT OFF)
+  set(SDL_LOADSO_ENABLED_BY_DEFAULT OFF)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT tracker)
+
+
+SET(CMAKE_SYSTEM_NAME Generic)
+SET(CMAKE_SYSTEM_VERSION 1)
+SET(CMAKE_SYSTEM_PROCESSOR mips)
+SET(CMAKE_C_COMPILER mips64r5900el-ps2-elf-gcc)
+SET(CMAKE_CXX_COMPILER mips64r5900el-ps2-elf-g++)
+SET(CMAKE_C_FLAGS_INIT "-I$ENV{PS2SDK}/ee/include -I$ENV{PS2SDK}/common/include -I$ENV{PS2SDK}/ports/include -D_EE -DPS2 -D__PS2__ -O2 -G0")
+SET(CMAKE_CXX_FLAGS_INIT "-I$ENV{PS2SDK}/ee/include -I$ENV{PS2SDK}/common/include -I$ENV{PS2SDK}/ports/include -D_EE -DPS2 -D__PS2__ -O2 -G0")
+SET(CMAKE_EXE_LINKER_FLAGS_INIT "-T$ENV{PS2SDK}/ee/startup/linkfile -L$ENV{PS2SDK}/ee/lib -L$ENV{PS2DEV}/gsKit/lib -L$ENV{PS2SDK}/ports/lib -Wl,-zmax-page-size=128")
+#SET(CMAKE_SHARED_LINKER_FLAGS_INIT "...")
+#SET(CMAKE_STATIC_LINKER_FLAGS_CONFIG_INIT "...")
+#SET(CMAKE_STATIC_LINKER_FLAGS_INIT "...")
+SET(CMAKE_TARGET_INSTALL_PREFIX $ENV{PS2DEV}/ports)
+
+SET(CMAKE_FIND_ROOT_PATH $ENV{PS2DEV} $ENV{PS2DEV}/ee $ENV{PS2DEV}/ee/ee $ENV{PS2SDK} $ENV{PS2SDK}/ports)
+SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+SET(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+
+include("/Users/richardgracik/ps2toolchain/ps2dev/ps2sdk/ps2dev.cmake" REQUIRED)
+
+
+include_directories(
+    ${PS2SDK}/common/include
+    ${PS2SDK}/ee/include
+    ${PS2SDK}/ports/include
+    # Add any other include directories as necessary
+)
+
+link_directories(
+    ${PS2SDK}/common/lib
+    ${PS2SDK}/ee/lib
+    ${PS2SDK}/ports/lib
+    # Add any other link directories as necessary
+)
+
+
+SET(PLATFORM_PS2 TRUE)
+SET(PS2 TRUE)

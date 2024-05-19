@@ -144,7 +144,7 @@ public:
 
 	pp_int32 compareToNoCase(const PPSystemString& str) const
 	{
-		return strcasecmp(strBuffer, str.strBuffer);
+		return strcmp(strBuffer, str.strBuffer);
 	}
 	
 	void toUpper()
@@ -310,7 +310,7 @@ public:
 		if (*ptrDst == '\0')
 			return noExt1 ? 0 : 1;
 
-		return strcasecmp(ptrSrc, ptrDst);
+		return strcmp(ptrSrc, ptrDst);
 	}
 
 	
@@ -328,7 +328,7 @@ public:
 		if (*ptrSrc == '\0')
 			return false;
 
-		return strcasecmp(ptrSrc, extension.strBuffer) == 0;
+		return strcmp(ptrSrc, extension.strBuffer) == 0;
 	}
 	
 	void ensureTrailingCharacter(char chr)

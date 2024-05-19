@@ -8,3 +8,6 @@ resources/pictures/docicons/osx/docerator/
 # Editor config files
 .vscode/
 .vs/
+
+
+.DS_Store

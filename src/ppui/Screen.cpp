@@ -90,10 +90,6 @@ void PPScreen::adjustEventMouseCoordinates(PPEvent* event)
 
 void PPScreen::raiseEvent(PPEvent* event)
 {
-	if (event->isMouseEvent())
-		adjustEventMouseCoordinates(event);
-
-	// route events to event listener first
 	eventListener->handleEvent(reinterpret_cast<PPObject*>(this), event);
 
 	if (event->getID() == eInvalid)
@@ -112,7 +108,7 @@ void PPScreen::raiseEvent(PPEvent* event)
 		}
 		return;
 	}
-
+	
 	if (modalControl && modalControl->isVisible())
 	{
 		// listener of the modal control also gets a chance to listen to these events
@@ -128,6 +124,7 @@ void PPScreen::raiseEvent(PPEvent* event)
 		return;
 	}
 
+	//printf("ppscreen 4\n");
 	// ------- handle context menu -----------------------------------
 	if (contextMenuControls->size())
 	{	
@@ -224,7 +221,10 @@ void PPScreen::raiseEvent(PPEvent* event)
 			return;
 	}
 
+	//printf("ppscreen 5\n");
 	rootContainer->dispatchEvent(event);
+	
+	//printf("ppscreen 6\n");
 }
 
 void PPScreen::pauseUpdate(bool pause)

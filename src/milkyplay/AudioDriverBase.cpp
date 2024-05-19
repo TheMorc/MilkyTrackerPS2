@@ -57,7 +57,7 @@ void AudioDriverBase::msleep(mp_uint32 msecs)
 	if(msecs < 1000) msecs = 1000;
 	sleep(msecs/1000);
 #else
-	usleep(msecs*1000);
+	//msleep(msecs);
 #endif
 }
 
@@ -99,7 +99,7 @@ void AudioDriverBase::setIdle(bool idle)
 		const mp_uint32 sleepTime = 10;
 		while (!this->idle && time <= (mp_uint32)waitMillis)
 		{
-			msleep(sleepTime);
+			//msleep(sleepTime);
 			time+=sleepTime;
 		}
 		if (!this->idle)

@@ -56,7 +56,14 @@
 #include "config.h"
 #endif
 
+
+#define PATH_MAX 4096
+
 #include <stdio.h>
+#include <tamtypes.h>
+#include <sifrpc.h>
+#include <debug.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -148,9 +155,13 @@ static void RaiseEventSerialized(PPEvent* event)
 {
 	if (myTrackerScreen && myTracker)
 	{
+		//printf("mutexlock1\n");
 		globalMutex->lock();
+		//printf("mutexlock2\n");
 		myTrackerScreen->raiseEvent(event);
+		//printf("mutexunlock1\n");
 		globalMutex->unlock();
+		//printf("mutexunlock2\n");
 	}
 }
 
@@ -174,7 +185,7 @@ static Uint32 SDLCALL timerCallback(Uint32 interval, void* param)
 	SDL_UserEvent ev;
 	ev.type = SDL_USEREVENT;
 
-	if (!(timerTicker % 1))
+	if (!(timerTicker % 3))
 	{
 		ev.code = SDLUserEventTimer;
 		SDL_PushEvent((SDL_Event*)&ev);
@@ -220,6 +231,8 @@ static Uint32 SDLCALL timerCallback(Uint32 interval, void* param)
 		//PPEvent myEvent(eRMouseRepeat, &p, sizeof(PPPoint));
 		//RaiseEventSerialized(&myEvent);
 	}
+	
+ 	//scr_printf("timer callback!\n");
 
 	return interval;
 }
@@ -276,7 +289,7 @@ void StartMidiRecording(unsigned int devID)
 	if (!myMidiReceiver->startRecording(devID))
 	{
 		// Deal with error
-		fprintf(stderr, "Failed to initialise ALSA MIDI support.\n");
+		scr_printf("Failed to initialise ALSA MIDI support.\n");
 	}
 }
 
@@ -633,12 +646,115 @@ void translateKeyUpEvent(const SDL_Event& event)
 	RaiseEventSerialized(&myEvent);
 }
 
+SDL_Joystick* gGameController = NULL;
+int xDir = 320;
+int yDir = 210;
+
+void ps2MouseAxis(int axis, int value)
+{
+	switch(axis){
+		case 0:
+			xDir = xDir + (value/1000);
+			break;
+		case 1:
+			yDir = yDir + (value/1000);
+			break;
+	}
+	
+	SDL_WarpMouseInWindow(myDisplayDevice->getWindow(),xDir, yDir);
+	myDisplayDevice->update(PPRect(xDir, yDir, xDir+20, yDir+20));
+}
+
+void ps2MouseButton(int button, int down)
+{
+	switch (button){
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+			myDisplayDevice->update();
+			break;
+			
+		case 5:
+			xDir = xDir + 13;
+			SDL_WarpMouseInWindow(myDisplayDevice->getWindow(),xDir, yDir);
+			break;
+			
+		case 7:
+			xDir = xDir - 13;
+			SDL_WarpMouseInWindow(myDisplayDevice->getWindow(),xDir, yDir);
+			break;
+			
+		case 6:
+			yDir = yDir + 13;
+			SDL_WarpMouseInWindow(myDisplayDevice->getWindow(),xDir, yDir);
+			break;
+			
+		case 4:
+			yDir = yDir - 13;
+			SDL_WarpMouseInWindow(myDisplayDevice->getWindow(),xDir, yDir);
+			break;
+			
+		case 14:
+			if(down)
+				translateMouseDownEvent(1, xDir, yDir);
+			else
+				translateMouseUpEvent(1, xDir, yDir);
+			break;
+			
+		case 13:
+			if(down)
+				translateMouseDownEvent(3, xDir, yDir);
+			else
+				translateMouseUpEvent(3, xDir, yDir);
+			break;
+		
+		case 15:
+			{
+			pp_uint16 chr2[3] = {0x4C, 0, 0};
+			PPEvent event3(eKeyDown, &chr2, sizeof(chr2));
+			RaiseEventSerialized(&event3);
+			}
+			break;
+			
+		case 12:
+		{
+			pp_uint16 chr[3] = {VK_RETURN, 0, 0};
+			PPEvent event(eKeyDown, &chr, sizeof(chr));
+			RaiseEventSerialized(&event);
+		}
+			break;
+			
+	}
+	myDisplayDevice->update();
+}
+
+//DS3 layout
+//      4                 3          12
+// 
+//  7       5        0           15      13
+//
+//      6                            14
+//             1          2
+
 void processSDLEvents(const SDL_Event& event)
 {
 	pp_uint32 mouseButton = 0;
-
+	//scr_printf("sdl event");
 	switch (event.type)
 	{
+		 case SDL_JOYAXISMOTION:
+             ps2MouseAxis(event.jaxis.axis, event.jaxis.value);
+             break;
+
+         case SDL_JOYBUTTONDOWN:
+             ps2MouseButton(event.jbutton.button, 1);
+             break;
+
+         case SDL_JOYBUTTONUP:
+             ps2MouseButton(event.jbutton.button, 0);
+             break;
+
 		case SDL_MOUSEBUTTONDOWN:
 			mouseButton = event.button.button;
 			translateMouseDownEvent(mouseButton, event.button.x, event.button.y);
@@ -685,52 +801,13 @@ void processSDLUserEvents(const SDL_UserEvent& event)
 		case SDLUserEventTimer:
 		{
 			// Prevent new timer events being pushed while we are processing the current one
+			
 			ticking = false;
 			PPEvent myEvent(eTimer);
 			RaiseEventSerialized(&myEvent);
 			ticking = true;
 			break;
 		}
-
-		case SDLUserEventLMouseRepeat:
-		{
-			PPPoint p;
-			p.x = data1.i32;
-			p.y = data2.i32;
-			PPEvent myEvent(eLMouseRepeat, &p, sizeof(PPPoint));
-			RaiseEventSerialized(&myEvent);
-			break;
-		}
-
-		case SDLUserEventRMouseRepeat:
-		{
-			PPPoint p;
-			p.x = data1.i32;
-			p.y = data2.i32;
-			PPEvent myEvent(eRMouseRepeat, &p, sizeof(PPPoint));
-			RaiseEventSerialized(&myEvent);
-			break;
-		}
-
-		case SDLUserEventMidiKeyDown:
-		{
-			pp_int32 note = data1.i32;
-			pp_int32 volume = data2.i32;
-			globalMutex->lock();
-			myTracker->sendNoteDown(note, volume);
-			globalMutex->unlock();
-			break;
-		}
-
-		case SDLUserEventMidiKeyUp:
-		{
-			pp_int32 note = data1.i32;
-			globalMutex->lock();
-			myTracker->sendNoteUp(note);
-			globalMutex->unlock();
-			break;
-		}
-
 	}
 }
 
@@ -748,13 +825,13 @@ void crashHandler(int signum)
 
 	if (signum == 15)
 	{
-		fprintf(stderr, "\nTERM signal received.\n");
+		scr_printf("\nTERM signal received.\n");
 		SDL_Quit();
 		return;
 	}
 	else
 	{
-		fprintf(stderr, "\nCrashed with signal %i\n"
+		scr_printf("\nCrashed with signal %i\n"
 				"Please submit a bug report stating exactly what you were doing "
 				"at the time of the crash, as well as the above signal number. "
 				"Also note if it is possible to reproduce this crash.\n", signum);
@@ -764,11 +841,11 @@ void crashHandler(int signum)
 	{
 		if (myTracker->saveModule(buffer) == MP_DEVICE_ERROR)
 		{
-			fprintf(stderr, "\nUnable to save backup (read-only filesystem?)\n\n");
+			scr_printf("\nUnable to save backup (read-only filesystem?)\n\n");
 		}
 		else
 		{
-			fprintf(stderr, "\nA backup has been saved to %s\n\n", buffer);
+			scr_printf("\nA backup has been saved to %s\n\n", buffer);
 		}
 	}
 
@@ -781,9 +858,9 @@ void initTracker(pp_uint32 bpp, PPDisplayDevice::Orientations orientation,
 				 bool swapRedBlue, bool noSplash)
 {
 	// Initialize SDL
-	if ( SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0 )
+	if ( SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK) < 0 )
 	{
-		fprintf(stderr, "Couldn't initialize SDL: %s\n",SDL_GetError());
+		scr_printf("Couldn't initialize SDL: %s\n",SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
 
@@ -809,41 +886,60 @@ void initTracker(pp_uint32 bpp, PPDisplayDevice::Orientations orientation,
 
 	// ------------ Initialise tracker ---------------
 	myTracker = new Tracker();
+ 	scr_printf("tracker init!\n");
 
 	PPSize windowSize = myTracker->getWindowSizeFromDatabase();
 	bool fullScreen = myTracker->getFullScreenFlagFromDatabase();
 	pp_int32 scaleFactor = myTracker->getScreenScaleFactorFromDatabase();
 
-#ifdef __LOWRES__
-	windowSize.width = DISPLAYDEVICE_WIDTH;
-	windowSize.height = DISPLAYDEVICE_HEIGHT;
-#endif
+ 	scr_printf("windowsize!\n");
+
+	windowSize.width = 640;
+	windowSize.height = 448;
 
 myDisplayDevice = new PPDisplayDeviceFB(windowSize.width, windowSize.height, scaleFactor,
-										bpp, fullScreen, orientation, swapRedBlue);
+										16, true, orientation, swapRedBlue);
 
-	SDL_SetWindowTitle(myDisplayDevice->getWindow(), "Loading MilkyTracker...");
+ 	scr_printf("devicefb!\n");
+	//SDL_SetWindowTitle(myDisplayDevice->getWindow(), "Loading MilkyTracker...");
 	myDisplayDevice->init();
+ 	scr_printf("displaydevice init!\n");
 
 	myTrackerScreen = new PPScreen(myDisplayDevice, myTracker);
 	myTracker->setScreen(myTrackerScreen);
+ 	scr_printf("set screen!\n");
 
 	// Startup procedure
 	myTracker->startUp(noSplash);
-
-#ifdef HAVE_LIBRTMIDI
-	InitMidi();
-#endif
+ 	scr_printf("start up!\n");
 
 	// Try to create timer
 	timer = SDL_AddTimer(20, timerCallback, NULL);
 
-	// Start capturing text input events
-	SDL_StartTextInput();
+ 	//Start capturing text input events
+ 	SDL_StartTextInput();
+	SDL_ShowCursor(false);
+	
+	///joy
+    // If there was an error setting up the joystick subsystem, quit.
 
+    // Check how many joysticks are connected.
+    int joysticks = SDL_NumJoysticks();
+    printf("There are %d joysticks connected.\n", joysticks);
 
+    // If there are joysticks connected, open one up for reading
+    if (joysticks > 0) {
+        if (SDL_JoystickOpen(0) == NULL) {
+            printf("There was an error reading from the joystick.\n");
+        }
+    }
+    // If there are no joysticks connected, exit the program.
+    else {
+        printf("There are no joysticks connected. Exiting...\n");
+    }
+	
 	// Kickstart SDL event loop last to prevent overflowing message-queue on lowmem systems 
-  // splash screen will still be visible
+	//splash screen will still be visible
 	SDL_PumpEvents();
 
 	ticking = true;
@@ -880,12 +976,15 @@ void SendFile(char *file)
 	RaiseEventSerialized(&event);
 }
 
-#if defined(__PSP__)
-extern "C" int SDL_main(int argc, char *argv[])
-#else
+
 int main(int argc, char *argv[])
-#endif
 {
+	SifInitRpc(0);
+  	init_scr();
+ 	scr_setXY(20, 3);
+ 	scr_printf("milkytracker port by Morc!\n");
+
+
 	SDL_Event event;
 	char *loadFile = 0;
 	char loadFileAbsPath[PATH_MAX];
@@ -895,154 +994,28 @@ int main(int argc, char *argv[])
 	bool swapRedBlue = false, noSplash = false;
 	bool recVelocity = false;
 
-	// Parse command line
-	while ( argc > 1 )
-	{
-		--argc;
-
-#ifdef __APPLE__
-		// OSX: Swallow "-psn_xxx" argument passed by Finder on OSX <10.9
-		if ( strncmp(argv[argc], "-psn", 4) == 0 )
-		{
-			continue;
-		}
-		else
-#endif
-		if ( strcmp(argv[argc-1], "-bpp") == 0 )
-		{
-			defaultBPP = atoi(argv[argc]);
-			--argc;
-		}
-		else if ( strcmp(argv[argc], "-nosplash") == 0 )
-		{
-			noSplash = true;
-		}
-		else if ( strcmp(argv[argc], "-swap") == 0 )
-		{
-			swapRedBlue = true;
-		}
-		else if ( strcmp(argv[argc-1], "-orientation") == 0 )
-		{
-			if (strcmp(argv[argc], "NORMAL") == 0)
-			{
-				orientation = PPDisplayDevice::ORIENTATION_NORMAL;
-			}
-			else if (strcmp(argv[argc], "ROTATE90CCW") == 0)
-			{
-				orientation = PPDisplayDevice::ORIENTATION_ROTATE90CCW;
-			}
-			else if (strcmp(argv[argc], "ROTATE90CW") == 0)
-			{
-				orientation = PPDisplayDevice::ORIENTATION_ROTATE90CW;
-			}
-			else
-				goto unrecognizedCommandLineSwitch;
-			--argc;
-		}
-		else if ( strcmp(argv[argc], "-recvelocity") == 0)
-		{
-			recVelocity = true;
-		}
-		else
-		{
-unrecognizedCommandLineSwitch:
-			if (argv[argc][0] == '-')
-			{
-				fprintf(stderr,
-						"Usage: %s [-bpp N] [-swap] [-orientation NORMAL|ROTATE90CCW|ROTATE90CW] [-nosplash] [-recvelocity]\n", argv[0]);
-				exit(1);
-			}
-			else
-			{
-				loadFile = argv[argc];
-			}
-		}
-	}
-
 	globalMutex = new PPMutex();
+ 	scr_printf("mutex!\n");
 
 	// Store current working path (init routine is likely to change it)
 	PPPath_POSIX path;
-	PPSystemString oldCwd = path.getCurrent();
 
 	globalMutex->lock();
+ 	scr_printf("mutexlock!\n");
 	initTracker(defaultBPP, orientation, swapRedBlue, noSplash);
 	globalMutex->unlock();
-
-#ifdef HAVE_LIBRTMIDI
-	if (myMidiReceiver && recVelocity)
-	{
-		myMidiReceiver->setRecordVelocity(true);
-	}
-#endif
-
-	if (loadFile)
-	{
-		PPSystemString newCwd = path.getCurrent();
-		path.change(oldCwd);
-		
-		struct stat statBuf;
-
-		if (stat(realpath(loadFile, loadFileAbsPath), &statBuf) != 0)
-		{
-			fprintf(stderr, "could not open %s: %s\n", loadFile, strerror(errno));
-		}
-		else
-		{
-			SendFile(realpath(loadFile, loadFileAbsPath));
-			path.change(newCwd);
-			pp_uint16 chr[3] = {VK_RETURN, 0, 0};
-			PPEvent event(eKeyDown, &chr, sizeof(chr));
-			RaiseEventSerialized(&event);
-		}
-	}
-
+	path.change("mc0:/");
+	
 	// Main event loop
 	done = 0;
 	while (!done && SDL_WaitEvent(&event))
 	{
 		switch (event.type)
-		{
-			case SDL_QUIT:
-				exitSDLEventLoop(false);
-				break;
-			case SDL_MOUSEMOTION:
-			{
-				// Ignore old mouse motion events in the event queue
-				SDL_Event new_event;
-
-				if (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0)
-				{
-					while (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0);
-					processSDLEvents(new_event);
-				}
-				else
-				{
-					processSDLEvents(event);
-				}
-				break;
-			}
-
-			// Open modules drag 'n dropped onto MilkyTracker (currently only works on Dock icon, OSX)
-			case SDL_DROPFILE:
-				SendFile(event.drop.file);
-				SDL_free(event.drop.file);
-				break;
-
-			// Refresh GUI if window is unhidden or resized
-			case SDL_WINDOWEVENT:
-				switch (event.window.event) {
-                    case SDL_WINDOWEVENT_EXPOSED:
-					case SDL_WINDOWEVENT_RESIZED:
-                    case SDL_WINDOWEVENT_SHOWN:
-						myTrackerScreen->update();
-				}
-				break;
-
+		{	
 			case SDL_USEREVENT:
 				processSDLUserEvents((const SDL_UserEvent&)event);
 				break;
-
+		
 			default:
 				processSDLEvents(event);
 				break;
@@ -1053,9 +1026,6 @@ unrecognizedCommandLineSwitch:
 	SDL_RemoveTimer(timer);
 
 	globalMutex->lock();
-#ifdef HAVE_LIBRTMIDI
-	delete myMidiReceiver;
-#endif
 	delete myTracker;
 	myTracker = NULL;
 	delete myTrackerScreen;
@@ -1067,3 +1037,6 @@ unrecognizedCommandLineSwitch:
 
 	return 0;
 }
+
+
+

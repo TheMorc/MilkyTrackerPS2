@@ -255,7 +255,7 @@ struct PPColor
 #ifdef WIN32
 #define STRINGCOMPARE_NOCASE(left, right) _stricmp(left, right)
 #else
-#define STRINGCOMPARE_NOCASE(left, right) strcasecmp(left, right)
+#define STRINGCOMPARE_NOCASE(left, right) strcmp(left, right)
 #endif
 
 // C-String wrapper

@@ -164,17 +164,13 @@ const PPPathEntry* PPPath_POSIX::getNextEntry()
 
 bool PPPath_POSIX::canGotoHome() const
 {
-	return getenv("HOME") ? true : false;
+	return true;
 }
 
 void PPPath_POSIX::gotoHome()
 {
-	char* home = getenv("HOME");
-	if (home)
-	{
-		change(home);
-		updatePath();
-	}
+	change("mass:");
+	updatePath();
 }
 
 bool PPPath_POSIX::canGotoRoot() const
@@ -184,7 +180,7 @@ bool PPPath_POSIX::canGotoRoot() const
 
 void PPPath_POSIX::gotoRoot()
 {
-	change("/");
+	change("hdd0:");
 	updatePath();
 }
 
@@ -195,7 +191,8 @@ bool PPPath_POSIX::canGotoParent() const
 
 void PPPath_POSIX::gotoParent()
 {
-	stepInto("..");
+	change("mc0:");
+	updatePath();
 }
 
 char PPPath_POSIX::getPathSeparatorAsASCII() const
